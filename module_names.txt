@@ -1,0 +1,12 @@
+1	Dịch vụ quản lý drone	23	3
+2 	Dịch vụ quản lý payload	26	5
+3	Dịch vụ quản lý user	19	2
+4	Quản lý video/image	12	3
+5	Dịch vụ quản lý sự cố	13	5
+6	Dịch vụ quản lý đối tượng giám sát	18	4
+7	Dịch vụ quản lý, báo cáo thống kê	20	6
+8	Dịch vụ quản lý cảnh báo	18	4
+9	Dịch vụ quản lý lịch sử hoạt động	20	5
+10	Dịch vụ quản lý miền giám sát	22	2
+11	Dịch vụ quản lý Công việc xử lý sự cố	10	1
+12	Dịch vụ quản lý Flight Hub	18	2
