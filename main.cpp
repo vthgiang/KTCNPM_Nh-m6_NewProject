@@ -9,7 +9,7 @@
 #include <numeric>
 
 const double INF = 1e18;
-const int GROUP_LIMIT = 3;
+int GROUP_LIMIT = 3;
 const int NUM_TEAM = 4;
 const int DIST_SIZE = 30;
 
@@ -148,6 +148,23 @@ void read_relations(const char* inputfile) {
     std::cerr << "done read_relations " << n << std::endl;
 }
 
+Distribution calc_cost(int before, int group_mask) {
+    Distribution cost = {1};
+    for (int u = 0; u < n; ++u) if (group_mask >> u & 1) {
+        double intra_cost = 0;
+        for (auto e : into[u]) {
+            int v = e.v;
+            if (!(before >> v & 1)) {
+                intra_cost += e.w;
+            }
+        }
+        Distribution cur = node_dist[u] + normal(intra_cost, 0.1, DIST_SIZE);
+        cost = cost ^ cur;
+    }
+    cost = cost / NUM_TEAM;
+    return cost;
+}
+
 std::vector< std::pair< std::vector<int>, Distribution> >  solve() {
     std::vector<Distribution> dp(1 << n, {1});
     std::vector<int> trace(1 << n);
@@ -174,34 +191,15 @@ std::vector< std::pair< std::vector<int>, Distribution> >  solve() {
             if (__builtin_popcount(group_mask) > GROUP_LIMIT) {
                 continue;
             }
-            Distribution cost = {1};
-            for (int u = 0; u < n; ++u) if (group_mask >> u & 1) {
-                double intra_cost = 0;
-                for (auto e : into[u]) {
-                    int v = e.v;
-                    if (!((mask ^ group_mask) >> v & 1)) {
-                        intra_cost += e.w;
-                    }
-                }
-                Distribution cur = node_dist[u] + normal(intra_cost, 0.1, DIST_SIZE);
-                cost = cost ^ cur;
-//                if (mask == 8)
-//                  std::cerr << "intra_cost " << intra_cost << ' ' << node_dist[u].mean() << ' ' << cur.mean() << ' ' << cost.mean() << std::endl; 
-            }
-            cost = cost / NUM_TEAM;
-            Distribution cand = dp[mask ^ group_mask] + cost; 
-//            if (mask == 8)
-//                std::cerr << "cand " << cand.mean() << ' ' << dp[mask].mean() << std::endl;
+            int before = mask ^ group_mask;
+            Distribution cost = calc_cost(before, group_mask);
+            Distribution cand = dp[before] + cost; 
             if (cand.mean() < dp[mask].mean()) {
                 dp[mask] = cand;
-//                 std::cerr << "minimized " << dp[mask].mean() << std::endl;
                 group_dist[mask] = cost;
                 trace[mask] = group_mask;
             }
         }
-//        if (mask == 8) {
-//            std::cerr << "dp " << mask << ' ' << dp[mask].mean() << std::endl;                     
-//        }
     }
     std::cerr << "done DP\n";
 
@@ -222,27 +220,59 @@ std::vector< std::pair< std::vector<int>, Distribution> >  solve() {
     return result;
 }
 
+std::vector< std::pair< std::vector<int>, Distribution> > read_result(std::string filename) {
+    std::vector< std::pair< std::vector<int>, Distribution> > result;
+    std::ifstream fin(filename);
+    std::string line;
+    int before = 0;
+    while (std::getline(fin, line)) {
+        std::istringstream iss(line);
+        std::vector<int> group;
+        int group_mask = 0;
+        int u;
+        while (iss >> u) {
+            group.push_back(u);
+            group_mask |= 1 << (u - 1);
+        }
+        result.push_back({group, calc_cost(before, group_mask)});
+        before |= group_mask;
+    }
+
+    return result;
+}
+
 int main(int argc, char* argv[]) {
-    read_relations(argv[1]); 
+    GROUP_LIMIT = atoi(argv[1]);
+    read_relations(argv[2]); 
     read_dist("out/");
-    std::vector< std::pair< std::vector<int>, Distribution> > result = solve();
+
+    std::vector< std::pair< std::vector<int>, Distribution> > result;
+
+    if (argc > 3) {
+        result = read_result(argv[3]);       
+    } else {
+        result = solve();
+    }
+
+    std::ofstream group_out("result_group.txt");
+    std::ofstream dist_out("result_dist.txt");
 
     Distribution disttill = {1};
     for (const auto &g : result) {
         for (int v : g.first) {
-            std::cout << v << ' ';
+            group_out << v << ' ';
         }
-        std::cout << std::endl;
+        group_out << std::endl;
         for (double v : g.second) {
-            std::cout << std::setprecision(6) << std::fixed << v << ' ';
+            dist_out << std::setprecision(6) << std::fixed << v << ' ';
         }
-        std::cout << std::endl;
+        dist_out << std::endl;
         disttill = disttill + g.second;
         for (double v : disttill) {
-            std::cout << std::setprecision(6) << std::fixed << v << ' ';
+            dist_out << std::setprecision(6) << std::fixed << v << ' ';
         }
 
-        std::cout << std::endl;
+        dist_out << std::endl;
         std::cerr << std::accumulate(g.second.begin(), g.second.end(), 0.0) << std::endl;
     }
     std::cerr << "Mean = " << disttill.mean() << std::endl;
